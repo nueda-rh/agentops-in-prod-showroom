@@ -200,4 +200,161 @@ NOTE: システムプロンプトを更新して新しいバージョンを登�
 
 優れた評価の基盤となるのは、高品質なデータセットです。ノートブックは、プロスペクトエージェントの代表的なテストケースを含む永続的なデータセットを MLflow サーバー上に作成します。
 
-. **2. Create Evaluation Dataset** と **3. View the Dataset** の下にあるセルを実行します。ノートブックは 6
+. **2. Create Evaluation Dataset** と **3. View the Dataset** の下にあるセルを実行します。ノートブックは 6 つのテストケースを作成し、それぞれに以下が含まれます：
++
+--
+* **inputs (入力)**: エージェントに送信するユーザーメッセージ (例: _"Tell me about FHA loans" (FHAローンについて教えて)_)
+* **expectations (期待値)**: キーワード、ツール呼び出し、トピック、禁止されたコンテンツを含む、期待される動作
+--
+
+. MLflow UI で、実験に移動し、**Datasets** をクリックします。
++
+image::nav-datasets.png[]
++
+
+6 つのレコードを持つ `public_assistant_eval` データセットが表示されます：
++
+image::eval7.1.png[MLflow Datasets page showing public_assistant_eval with 6 records and their inputs and expectations,link=self,window=blank,width=700]
++
+各レコードには、ユーザーメッセージの入力とともに、期待される回答と期待されるツール呼び出しが表示されます。たとえば、_"Tell me about FHA loans"_ の場合、応答に `"FHA"` というキーワードが含まれ、`product_info` ツールが呼び出されることが期待されます。
+
+NOTE: データセットはローカルファイルとしてではなく、MLflow サーバーに保存されます。つまり、バージョン管理され、チームメンバー間で共有可能で、複数の評価の実行で再利用できます。新しいチームメンバーが参加した際にも、同じテストケースに対して評価を実行するため、チーム全体で一貫した品質基準が確保されます。
+
+IMPORTANT: 評価データセットを持たないチームは、顧客からの苦情を受けて初めて品質の問題に気づくことがよくあります。それでは数週間も遅すぎます。構造化されたデータセットは、本番環境に到達する前の開発段階でリグレッションをキャッチします。
+
+== 演習 5: シンプルな評価の実行
+
+ノートブックに戻り、決定論的スコアラー (単純なルールを使用して回答を採点する自動チェック) から始めましょう。これは LLM 呼び出しを必要としない高速なチェックです。これらは、明らかなリグレッションを検出するための最前線の防御線となります。
+
+=== シンプルなスコアラー
+
+ノートブックは 3 つの決定論的スコアラーを定義しています：
+
+* **contains_expected**: 応答に期待されるキーワードが含まれているか？ (例: FHA の質問に対する応答に "FHA" と記載されているか？)
+* **has_numeric_result**: 応答に金額や割合などの数値が含まれているか？ (支払い能力の計算に重要)
+* **response_length**: 応答が少なくとも 50 文字あるか？ (空または切り捨てられた応答をキャッチします)
+
+=== プレディクター(Predictor)の設定と評価の実行
+
+評価を実行する前に、ノートブックには 2 つの要素が必要です。**プレディクター関数** (各テストケースに対してエージェントを呼び出す関数) と **スコアラーの定義** です。プレディクターはエージェントの呼び出しをラップし、登録されたプロンプトをロードして、演習 7 で探索するプロンプトとトレース間の自動リンクを作成します。
+
+. **Predictor with Prompt Linkage** セクションと **Scorers** セクションのセルを実行して、両方を設定します。
+
+. 次に **Run Simple Evaluation** セルを実行します。ノートブックは各テストケースをライブエージェントに送信し、応答を収集してスコアリングします：
++
+image::eval7.png[Notebook running simple evaluation with 6 examples and 3 scorers showing results,link=self,window=blank,width=500]
++
+評価では、プロスペクトエージェントに対して 6 つのテストケースすべてが実行され、全体的なスコアが報告されます。
+
+NOTE: 失敗が見られた場合は、環境変数が正しく設定されているか再確認してください。環境変数を再度変更した場合は、セルを再実行する前にカーネルを再起動してください。
+
+=== MLflow で結果を表示する
+
+[start=3]
+. MLflow UI に戻り、**MLflow Console** タブを使用して、左側のサイドバーで **Evaluation runs** をクリックします。
+
++
+image::nav-eval-runs.png[]
++
+
+6 つのトレースすべてを含む評価実行が表示されます：
++
+image::eval8.png[MLflow Evaluation Runs showing the evaluation run with 6 traces and their requests responses and token counts,link=self,window=blank,width=700]
++
+各行には、トレース ID、エージェントに送信されたリクエスト、受信した応答、およびトークン数が表示されます。
+
+. 左側のサイドバーで **Traces** をクリックして、トレースごとのアセスメント (評価) を確認します。**Columns** をクリックし、**All Assessments** を有効にして、各トレースのスコアラー結果を表示します：
++
+image::eval9.png[MLflow Traces view with Assessment columns showing contains_expected has_numeric_result and response_length results per trace,link=self,window=blank,width=700]
++
+アセスメント列には、各トレースの各スコアラーに対する True/False が表示されます。どのテストケースが各チェックに合格したか、または失敗したかをすぐに見つけることができます。
++
+NOTE: 一部のアセスメント列に null 値が表示される場合があります。これは想定内のことです。この段階では、LLM-as-a-Judge スコアラーではなく、単純な決定的スコアラー (`contains_expected`, `has_numeric_result`, `response_length`) のみを実行しているためです。演習 6 でそれらを有効にすると、残りの列にデータが入力されます。
++
+NOTE: トレースビューにアセスメント列が表示されない場合は、**Columns** ドロップダウンを使用し、**All Assessments** を有効にしてください。MLflow では、デフォルトで常にこれらが表示されるとは限りません。
++
+image::eval32.png[MLflow Columns dropdown showing All Assessments option to enable assessment columns,link=self,window=blank,width=350]
+
+. シンプルなスコアラーの列 (`contains_expected`, `has_numeric_result`, `response_length`) が入力されているトレースをクリックします (この時点では、残りは null であるはずです)。**Assessments** サイドバーを含む詳細ビューが表示されます：
++
+image::eval10.png[MLflow trace detail showing inputs outputs span sequence and Assessments sidebar with Feedback and Expectations,link=self,window=blank,width=500]
++
+詳細ビューには、トレース情報 (入力、出力、スパンシーケンス) と評価アセスメントが組み合わされて表示されます。**Feedback** セクションには決定的スコアラーの結果が表示され、**Expectations** セクションにはデータセットからの期待値が表示されます。
+
+== 演習 6: LLM-as-a-Judge 評価の実行
+
+決定的スコアラーは表面的な問題をキャッチしますが、応答が**実際に役に立つか**どうかを評価することはできません。決定的スコアラーは応答の中に "FHA" を見つけて合格としますが、エージェントが間違った金利情報を提供したり、コンプライアンスのガイドラインに違反したりしたかどうかは検出できません。そのためには、ある LLM を使用して別の LLM の出力の品質を評価する https://mlflow.org/docs/latest/genai/eval-monitor/running-evaluation/agents/[LLM-as-a-Judge^] が必要になります。
+
+=== LLM Judge スコアラー
+
+ノートブックでは、3 つのシンプルなスコアラーに加えて、LLM を利用した 5 つのスコアラーを追加します：
+
+* **https://mlflow.org/docs/latest/genai/eval-monitor/scorers/llm-judge/tool-call/correctness/[ToolCallCorrectness^]**: エージェントは正しいツールを呼び出したか？ (例: 製品に関する質問に `product_info` を使用したか？)
+* **ToolCallEfficiency**: ツール呼び出しは最小限かつ効率的であったか？
+* **RelevanceToQuery**: 応答はユーザーの質問に関連しているか？
+* **Safety**: 応答は安全で適切か？
+* **Guidelines**: 応答はカスタムの住宅ローンアシスタントのガイドラインに従っているか？ (役立つ内容か、金利の約束をしていないか、専門的な言葉遣いか)
+
+=== 評価の実行
+
+. **Run Full LLM-as-a-Judge Evaluation** セルを実行します。これにより、6 つのテストケースに対して 8 つのスコアラーすべて (3つのシンプル + 5つの LLM ジャッジ) が実行されます：
++
+image::eval11.png[Notebook running LLM-as-a-Judge evaluation with 8 scorers including 5 LLM judges,link=self,window=blank,width=500]
++
+この評価は、各テストケースが決定的チェックに加えて 5 つの LLM ジャッジによってスコアリングされるため、シンプルな評価よりも時間がかかります。
+
+=== MLflow で結果を表示する
+
+[start=2]
+. MLflow UI で、**Evaluation runs** をクリックします。
+
++
+image::nav-eval-runs.png[]
++
+シンプルな評価と LLM-as-a-Judge 評価の 2 つの実行が表示されるようになります：
++
+image::eval12.png[MLflow Evaluation Runs showing 2 runs - simple and LLM-as-a-Judge,link=self,window=blank,width=700]
+
+. **Traces** をクリックし、**Columns** ドロップダウンを使用して **All Assessments** を有効にします。決定的結果と LLM ジャッジ結果の両方を含む全容が表示されます：
++
+image::eval13.png[MLflow Traces view with full assessment columns including tool_call_correctness safety and relevance,link=self,window=blank,width=700]
++
+追加された列には、各 LLM ジャッジの Pass/Fail (合格/不合格) が表示されます。`tool_call_correctness` は 83% の合格率を示し、`safety` は 100% を示していることに注目してください。エージェントは安全ですが、時折間違ったツールを呼び出しています。
+
+. トレースをクリックすると、詳細ビューで 8 つの評価すべてを確認できます：
++
+image::eval14.png[MLflow trace detail showing all 8 assessments including safety mortgage_guidelines tool_call_efficiency tool_call_correctness and relevance_to_query,link=self,window=blank,width=500]
++
+アセスメントサイドバーには、この 1 つのトレースの評価の全体像が表示されます：safety (Yes)、mortgage_guidelines (No、おそらく回答がカジュアルすぎた)、tool_call_efficiency (Yes)、tool_call_correctness (Yes)、relevance_to_query (Yes)、および 3 つの決定的チェック。
+
+TIP: LLM ジャッジは、決定的スコアラーが見逃す品質の問題をキャッチします。Fed Aura Capital のテストでは、LLM-as-a-Judge の評価により、キーワードチェックだけの場合よりも 17% 多くの品質問題（この評価レイヤーがなければ顧客に到達していたであろう問題）が特定されました。
+
+== 演習 7: プロンプトとトレースのリンクを探索する
+
+本番環境で品質が低下した際、プロンプトとトレースのリンク機能を使用すれば、何日もかけて手動で相関関係を調べることなく、「どのプロンプトのバージョンが原因か？」という問いに数秒で答えることができます。MLflow の評価フレームワークの重要な機能の 1 つは、プロンプトとトレース間の自動リンクです。すべての評価トレースは、それを生成したプロンプトバージョンにリンクされるため、プロンプトの反復ごとに品質を追跡できます。
+
+. MLflow UI で、**Prompts** に移動し、**public-assistant-system-prompt** をクリックします。**Traces** タブをクリックします：
++
+image::eval15.png[MLflow Prompts Traces tab showing evaluation traces linked to prompt version 1,link=self,window=blank,width=700]
++
+すべての評価トレースは、それらを生成したプロンプトのバージョンに自動的にリンクされます。システムプロンプトを更新してバージョン 2 を登録すると、将来の評価はその新しいバージョンにリンクされ、プロンプトの反復間で品質を並べて比較できるようになります。
+
+== モジュールのまとめ
+
+**達成したこと:**
+
+* Red Hat OpenShift AI で Jupyter ワークベンチを起動し、評価環境をセットアップしました
+* MLflow のプロンプトレジストリにプロスペクトエージェントのシステムプロンプトを登録しました
+* MLflow サーバー上に 6 つのテストケースを含む評価データセットを作成しました
+* ライブエージェントに対して決定的評価と LLM-as-a-Judge 評価を実行しました
+* MLflow でトレースごとのアセスメントとプロンプトとトレースのリンクを分析しました
+
+**これが重要な理由:**
+
+評価がなければ、目隠しで飛行しているようなものです。品質の低下は、顧客から苦情が来るまで検出されません。このインナーループの評価プロセスは、本番環境に到達してしまうエージェントの障害を開発段階でキャッチします。プロンプトのバージョン管理により、品質を損なう変更を数秒で特定し、ロールバックできます。LLM ジャッジは、シンプルなチェックでは見逃される微妙な障害（間違ったツール呼び出し、安全でない応答、ガイドライン違反）を検出します。
+
+**結論:** 評価は、インシデント発生後の消火活動からデプロイ前の予防へと、品質管理を「シフトレフト（プロセスの早い段階へ移行）」させます。
+
+**次のステップ:**
+
+モジュール 6 では、インナーループ (手動評価) からアウターループに移行し、AI パイプラインを使用して評価を自動化します。スケジュールまたはトリガーによって、継続的にリグレッションを検出できるようになります。
