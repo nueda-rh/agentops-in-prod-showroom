@@ -191,4 +191,130 @@ image::grafana1.png[Grafana AI Agent Metrics showing token usage and tool call s
 .AI Agent Metrics の PromQL の詳細 (クリックして展開)
 ====
 * **LLM Tokens**: `sum(increase(llm_tokens_total{namespace=~"$namespace"}[1h]))`
-* **Tool Success Rate**: `(sum(tool_calls_total{namespace=~"$namespace", status="success"}) / sum(tool_calls_total{namespace=~"$namespace"}) * 100)
+* **Tool Success Rate**: `(sum(tool_calls_total{namespace=~"$namespace", status="success"}) / sum(tool_calls_total{namespace=~"$namespace"}) * 100) or vector(100)`
+* **LLM Latency**: `histogram_quantile(0.50, sum(rate(llm_inference_duration_seconds_bucket{namespace=~"$namespace"}[5m])) by (le))`
+* **Routing Distribution**: `sum(agent_routing_total{namespace=~"$namespace"}) by (complexity)`
+====
+
+TIP: このダッシュボードは `GrafanaDashboard` カスタムリソースとして管理され、GitOps を通じてバージョン管理されています。これを確認するには、`oc get grafanadashboard -n {user_project}` を実行してください。
+
+モジュール 1 で生成したトラフィック (製品の探索、CEOのポートフォリオの健全性) は、すでにこれらのパネルに反映されています。時間範囲を **Last 1 hour** (過去1時間) に設定して確認してください。
+
+== 演習 2: LokiStack によるアプリケーションログの探索
+
+メトリクスは集約された健全性を示しますが、問題が発生した場合は実際のログイベントが必要です。Red Hat AI には、アプリケーションが STDOUT または STDERR に書き込んだすべてを自動的に収集する高性能なログ集約システムである **LokiStack** が含まれています。コードの変更は必要ありません。mortgage-ai のログを探索してみましょう。
+
+=== ログビューアへの移動
+
+. **OCP Console** タブに移動します。次に **Observe** → **Logs** に移動します。
++
+image::observe-logs.png[]
++
+**Forbidden — Missing permissions to get logs (禁止されています — ログを取得する権限がありません)** というエラーが表示されます：
++
+image::logging4.png[OpenShift Console Observe Logs showing Forbidden error for regular user,link=self,window=blank,width=700]
++
+これは想定通りの動作です。あなたは一般ユーザー (`{user}`) としてログインしているため、セキュリティ上の理由から、OpenShift はログへのアクセスをあなたのネームスペースのみに制限します。クラスター全体のログへのアクセスは、クラスター管理者に予約されています。
+
+=== ログをネームスペースにスコープする
+
+[start=2]
+. **Show Query** をクリックしてクエリエディタを開きます：
++
+image::logging5.png[OpenShift Console Logs Show Query button,link=self,window=blank,width=700]
++
+この LogQL クエリを入力して、ログのスコープをあなたのネームスペースに絞り込みます：
++
+[source,logql,role=execute,subs=attributes+]
+----
+{ log_type="application", kubernetes_namespace_name="{user_project}" }
+----
++
+**Run Query** をクリックします。これで、mortgage-ai ポッドからのログが表示されるはずです。
++
+TIP: `log_type="application"` は、インフラストラクチャログ (kubelet, CRI-O) を除外します。`kubernetes_namespace_name` ラベルは、ログコレクターによって自動的に挿入されます。
+
+=== ログフォーマットの理解
+
+表示されているのは構造化された JSON です。各ログエントリには以下が含まれています：
+
+* **Kubernetes メタデータ**: ポッドID、コンテナ名、ネームスペースラベル、ネットワーク設定
+* **アプリケーションメッセージ**: アプリケーションからの実際のログイベント (`message` フィールド内)
+* **タイムスタンプ**: イベントが発生した日時
+
+ログエントリをスクロールして `message` フィールドを見つけます。そこに有用なアプリケーションデータが存在します。メタデータは、コンテナ間でログを関連付けたり、ポッド、ネームスペース、またはコンテナでフィルタリングしたりするのに役立ちます。
+
+TIP: ログエントリ内の `message` フィールドをすばやく見つけるには、ブラウザの検索機能（Macの場合は **Cmd+F**、Windows/Linuxの場合は **Ctrl+F**）を使用して `"message"` を検索します。これにより、Kubernetes のメタデータをスキップして、アプリケーションのログコンテンツに直接ジャンプできます。
+
+=== アプリケーションメッセージの抽出
+
+[start=3]
+. LogQL を使用してアプリケーションメッセージのみを抽出し、API コンテナのログにフィルタリングします：
++
+[source,logql,role=execute,subs=attributes+]
+----
+{ log_type="application", kubernetes_namespace_name="{user_project}", kubernetes_container_name="api" }
+| json
+| line_format "{{.message}}"
+----
++
+これにより、Kubernetes のメタデータが取り除かれ、アプリケーションがログに書き込んだ内容のみが表示されます。
+
+=== ログ分析において AI がどのように役立つか
+
+生のログには豊富なデータが含まれていますが、JSON を手動で解析するのは面倒です。本番環境では、チームは AI を搭載したオブザーバビリティツールを使用して洞察を抽出できます：
+
+**AIアシスタントがこれらのログでできること:**
+
+* 「過去1時間の CEO エージェントからのすべてのエラーを表示して」
+* 「午後2時のレイテンシの急増の原因は何でしたか？」
+* 「今日の失敗したツール呼び出しを要約して」
+
+**AI が生成した洞察の例:**
+
+[source,text]
+----
+mortgage-ai ログの分析 (過去1時間):
+• 42回のツール呼び出し: 40回成功、2回失敗
+• 失敗: get_credit_score タイムアウト (30秒)
+• 最も遅いツール: get_pipeline_summary (平均 2.3秒)
+• 最もアクティブなエージェント: Prospect (27リクエスト)
+----
+
+生データは LokiStack に存在します。AI は、手動での JSON 解析や複雑なクエリなしに、そのデータへのアクセスを可能にします。
+
+=== ログとトレースは補完し合う関係にある
+
+ログは、エラー、警告、デバッグ出力、ツールの結果など、詳細なイベントをキャプチャします。これらは以下に不可欠です：
+
+* 特定の障害のデバッグ (「エラーメッセージは何だったか？」)
+* コンプライアンスイベントの監査 (「誰がこの PII にアクセスしたか？」)
+* 予期しない動作の調査 (「なぜこの計算がゼロを返したのか？」)
+
+**モジュール 4 ではトレースを紹介します。** トレースは以下の機能を提供することでログを補完します：
+
+* エージェントとツールにまたがる階層的なリクエストフロー
+* 各ステップの所要時間の内訳
+* 何が何を呼び出したかを示す親子関係
+
+ログとトレースを組み合わせることで、完全な可視性が得られます。詳細なイベントにはログを、リクエストフローにはトレースを使用します。
+
+IMPORTANT: **LokiStack は Red Hat AI のサポート対象機能です。** ログはポッドの寿命を超えて保持されます。コンテナが再起動または再デプロイされた場合でも、LokiStack は履歴ログを保持するため、インシデント発生後の調査が可能になります。マルチエージェントシステムの場合、API、UI、およびデータベースコンテナ間のイベントを関連付けるために、この永続的なログストレージが不可欠です。
+
+== モジュールのまとめ
+
+**達成したこと:**
+
+* HTTP と AI 固有のエージェントメトリクスを備えた Grafana ダッシュボードを探索しました
+* LokiStack と LogQL クエリを使用してアプリケーションログをフィルタリングしました
+* API コンテナと UI コンテナ間でログエントリを関連付けました
+
+**重要なポイント:**
+
+* エージェント型のアプリには、HTTP 以外にもトークン使用量、推論のレイテンシ、ルーティングの決定、ツールの成功率などのメトリクスが必要です
+* ログはメトリクスでは集約されて見えなくなる詳細を提供します。この詳細は、エフェメラル(短命)なコンテナのデバッグに不可欠です。
+* メトリクスは「どれくらい？」「どれくらい速い？」に答えます。ログは「正確に何が起きたか？」に答えます。
+
+**次のステップ:**
+
+モジュール 4 では MLflow のトレースについて紹介します。これは、**何が**起きているかだけでなく、**なぜ**それが起きるのかを理解するための鍵となります。
