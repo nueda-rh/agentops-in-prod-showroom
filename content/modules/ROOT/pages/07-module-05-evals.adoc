@@ -130,7 +130,7 @@ os.environ["MLFLOW_TRACKING_INSECURE_TLS"] = "true"
 入力する必要がある値は2つです：`LLM_API_KEY` と `MLFLOW_TRACKING_TOKEN`
 +
 --
-* `LLM_API_KEY`: これを **llm-credentials** シークレットから抽出します。OpenShift Console で、`{user_project}` ネームスペースの **Workloads > Secrets** に移動し、検索バーを使用してフィルタリングし、**llm-credentials** を見つけます。
+* `LLM_API_KEY`: これを **llm-credentials** シークレットから抽出します。OpenShift Console(OCP Consoleタブ) で、`{user_project}` ネームスペースの **Workloads > シークレット(もしくはSecrets)** に移動し、検索バーを使用してフィルタリングし、**llm-credentials** を見つけます。
 +
 image::eval2.2.png[OpenShift Console Secrets page showing llm-credentials secret in the workspace namespace,link=self,window=blank,width=700]
 --
