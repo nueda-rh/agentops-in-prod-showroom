@@ -215,7 +215,7 @@ image::mlflow8.png[MLflow span detail for ChatOpenAI showing model gpt-oss-120b 
 
 実際の多くの AI アプリケーションは、複数回のユーザーインタラクションを維持するためにセッションを使用します。https://mlflow.org/docs/latest/genai/tracing/track-users-sessions/[MLflow トレースは、トレースをユーザーに関連付け、それらをセッションにグループ化するための組み込みのサポート^]を提供します。LLM アプリケーションまたは AI エージェントでユーザーとセッションを追跡することは、ユーザーの行動を理解し、会話フローを分析し、パーソナライゼーションを改善するための重要なコンテキストを提供します。
 
-. MLflow の左側のサイドバーで、**Observability** の下にある **Sessions** をクリックします：
+. MLflow の左側のサイドバーで、**Traces** の下にある **Sessions** をクリックします：
 +
 image::sessions0.png[MLflow left sidebar showing Sessions under Observability,link=self,window=blank,width=700]
 
