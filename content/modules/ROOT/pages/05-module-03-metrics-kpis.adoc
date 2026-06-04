@@ -124,6 +124,8 @@ image::grafana-tab.png[]
 * **Username**: {user}
 * **Password**: {password}
 
+この時、"Authorize Access"という画面が表示されることがありますが、必要なアクセス権の付与のため、画面下部のボタンの左側、"Allow selected permissions"をクリックして下さい。
+
 Grafana インスタンスは、ワークスペースのネームスペースに事前デプロイされており、**Mortgage-AI Backend Metrics** ダッシュボードがすでに設定されています。これは 2 つの Prometheus データソースに接続します：
 
 * **User Workload Monitoring**: mortgage-ai アプリケーションのメトリクスをスクレイピングします (デフォルト)
