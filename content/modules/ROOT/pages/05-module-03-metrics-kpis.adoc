@@ -208,7 +208,7 @@ TIP: このダッシュボードは `GrafanaDashboard` カスタムリソース�
 
 === ログビューアへの移動
 
-. **OCP Console** タブに移動します。次に **Observe** → **Logs** に移動します。
+. **OCP Console** タブに移動します。次に **モニタリング(もしくはObserve)** → **Logs** に移動します。
 +
 image::observe-logs.png[]
 +
