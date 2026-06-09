@@ -94,7 +94,7 @@ image::git-clone.png[]
 +
 [source,console,role=execute,subs=attributes+]
 ----
-https://github.com/rh-ai-quickstart/multi-agent-loan-origination.git
+https://github.com/nueda-rh/multi-agent-loan-origination.git
 ----
 +
 image::eval2.png[JupyterLab Clone a repo dialog with the multi-agent-loan-origination repository URL,link=self,window=blank,width=700]
